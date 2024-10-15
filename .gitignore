@@ -1,0 +1,26 @@
+# Archivos generados por el compilador de TypeScript
+/dist/
+
+# Dependencias instaladas
+/node_modules/
+
+# Archivo de configuración de ambiente .env
+.env
+
+# Archivo de logs
+/logs/
+
+# Archivo de dependencias instaladas localmente
+/package-lock.json
+
+# Archivo de dependencias instaladas globalmente
+/yarn.lock
+
+# Archivos de caché de TypeScript
+/.tscache/
+
+# Archivos de caché de Jest
+/.jest/
+
+# Archivos temporales
+/.temp/
