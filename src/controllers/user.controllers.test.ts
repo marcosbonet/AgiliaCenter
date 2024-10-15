@@ -3,9 +3,12 @@ import express from "express";
 import mongoose from "mongoose";
 
 import User from "../models/Users";
-import UserControllers from "../controllers/user.controllers";
-
-const { register, signin, profile, unsubscribe } = UserControllers;
+import {
+  register,
+  signin,
+  profile,
+  unsubscribe,
+} from "../controllers/user.controllers";
 
 const app = express();
 app.use(express.json()); // Para manejar solicitudes JSON

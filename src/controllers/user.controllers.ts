@@ -1,25 +1,23 @@
-import { Request, Response } from "express";
+import { RequestHandler } from "express";
 import User from "../models/Users";
 import jwt from "jsonwebtoken";
 import bcrypt from "bcrypt";
 import { signUpValidation, signinValidation } from "../libs/joi";
 
-// Registro de usuario
-
-async function register(req: Request, res: Response): Promise<Response> {
-  const { error } = signUpValidation(req.body);
-  if (error) {
-    return res.status(400).json({ message: error.message });
-  }
-
-  const { nickname, nombre, apellido, direccion, email, password } = req.body;
-
+export const register: RequestHandler = async (req, res, next) => {
   try {
+    const { error } = signUpValidation(req.body);
+    if (error) {
+      res.status(400).json({ message: error.message });
+      return;
+    }
+
+    const { nickname, nombre, apellido, direccion, email, password } = req.body;
+
     const existingUser = await User.findOne({ email });
     if (existingUser) {
-      return res
-        .status(400)
-        .json({ message: "El correo electrónico ya está en uso" });
+      res.status(400).json({ message: "El correo electrónico ya está en uso" });
+      return;
     }
 
     const hashedPassword = await bcrypt.hash(password, 10);
@@ -33,48 +31,44 @@ async function register(req: Request, res: Response): Promise<Response> {
     });
 
     const savedUser = await newUser.save();
-    return res.status(200).json({
+    res.status(200).json({
       message: "Usuario registrado correctamente",
       user: savedUser,
     });
   } catch (error) {
-    console.error("Error al registrar usuario:", error);
-    return res.status(500).json({ message: "Error al registrar usuario" });
+    next(error);
   }
-}
+};
 
-// Inicio de sesión
-async function signin(req: Request, res: Response): Promise<Response> {
-  // Validar los datos de entrada con Joi
-  const { error } = signinValidation(req.body);
-  if (error) {
-    return res.status(400).json({ message: error.message });
-  }
-
-  const { email, password } = req.body;
-
+export const signin: RequestHandler = async (req, res, next) => {
   try {
-    // Buscar al usuario por email
+    const { error } = signinValidation(req.body);
+    if (error) {
+      res.status(400).json({ message: error.message });
+      return;
+    }
+
+    const { email, password } = req.body;
+
     const user = await User.findOne({ email });
     if (!user) {
-      return res.status(400).json({ message: "Usuario no encontrado" });
+      res.status(400).json({ message: "Usuario no encontrado" });
+      return;
     }
 
-    // Comparar la contraseña proporcionada con la almacenada
     const validPassword = await bcrypt.compare(password, user.password);
     if (!validPassword) {
-      return res.status(400).json({ message: "Contraseña incorrecta" });
+      res.status(400).json({ message: "Contraseña incorrecta" });
+      return;
     }
 
-    // Crear token JWT
     const token: string = jwt.sign(
       { id: user._id },
       process.env.TOKEN_SECRET || "",
-      { expiresIn: "1h" } // Token expira en 1 hora
+      { expiresIn: "1h" }
     );
 
-    // Retornar el token y los datos del perfil
-    return res.json({
+    res.json({
       token,
       profile: {
         nickname: user.nickname,
@@ -85,30 +79,34 @@ async function signin(req: Request, res: Response): Promise<Response> {
       },
     });
   } catch (error) {
-    console.error("Error durante el inicio de sesión:", error);
-    return res.status(500).json({ message: "Error interno del servidor" });
+    next(error);
   }
-}
+};
 
-// Obtener perfil de usuario
-async function profile(req: Request, res: Response): Promise<Response> {
+export const profile: RequestHandler = async (req, res, next) => {
   try {
-    // Obtener el token del encabezado Authorization
     const token = req.header("Authorization");
-    if (!token) return res.status(401).json({ message: "Acceso denegado" });
+    if (!token) {
+      res.status(401).json({ message: "Acceso denegado" });
+      return;
+    }
 
-    // Verificar el token
-    const payload = jwt.verify(token, process.env["TOKEN_SECRET"] || "");
-    if (!payload)
-      return res.status(404).json({ message: "Autenticación requerida" });
+    const payload = jwt.verify(
+      token,
+      process.env.TOKEN_SECRET || ""
+    ) as jwt.JwtPayload;
+    if (!payload.id) {
+      res.status(401).json({ message: "Token inválido" });
+      return;
+    }
 
-    // Buscar al usuario por ID
-    const user = await User.findById((payload as any).id);
-    if (!user)
-      return res.status(404).json({ message: "Usuario no encontrado" });
+    const user = await User.findById(payload.id);
+    if (!user) {
+      res.status(404).json({ message: "Usuario no encontrado" });
+      return;
+    }
 
-    // Retornar los datos del perfil
-    return res.json({
+    res.json({
       nickname: user.nickname,
       email: user.email,
       nombre: user.nombre,
@@ -116,39 +114,36 @@ async function profile(req: Request, res: Response): Promise<Response> {
       direccion: user.direccion,
     });
   } catch (error) {
-    console.error("Error al obtener el perfil del usuario:", error);
-    return res.status(500).json({ message: "Error interno del servidor" });
+    next(error);
   }
-}
+};
 
-async function unsubscribe(req: Request, res: Response): Promise<Response> {
+export const unsubscribe: RequestHandler = async (req, res, next) => {
   try {
-    // Obtener el token del encabezado Authorization
     const token = req.header("Authorization");
     if (!token) {
-      return res.status(401).json({ message: "Acceso denegado" });
+      res.status(401).json({ message: "Acceso denegado" });
+      return;
     }
 
-    // Verificar el token
-    const payload = jwt.verify(token, process.env.TOKEN_SECRET || "");
+    const payload = jwt.verify(
+      token,
+      process.env.TOKEN_SECRET || ""
+    ) as jwt.JwtPayload;
+    if (!payload.id) {
+      res.status(401).json({ message: "Token inválido" });
+      return;
+    }
 
-    // Buscar al usuario por ID y eliminarlo
-    const userId = (payload as any).id;
-    const deletedUser = await User.findByIdAndDelete(userId);
+    const deletedUser = await User.findByIdAndDelete(payload.id);
 
     if (!deletedUser) {
-      return res.status(404).json({ message: "Usuario no encontrado" });
+      res.status(404).json({ message: "Usuario no encontrado" });
+      return;
     }
 
-    return res.status(200).json({ message: "Usuario eliminado correctamente" });
+    res.status(200).json({ message: "Usuario eliminado correctamente" });
   } catch (error) {
-    console.error("Error al eliminar usuario:", error);
-    return res.status(500).json({ message: "Error interno del servidor" });
+    next(error);
   }
-}
-export default {
-  register,
-  signin,
-  profile,
-  unsubscribe,
 };

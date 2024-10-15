@@ -1,8 +1,12 @@
 import { Router } from "express";
 import { verifyToken } from "../middleware/auth";
-import UserControllers from "../controllers/user.controllers";
+import {
+  register,
+  signin,
+  profile,
+  unsubscribe,
+} from "../controllers/user.controllers";
 
-const { register, signin, profile, unsubscribe } = UserControllers;
 const router = Router();
 
 router.post("/register", register);

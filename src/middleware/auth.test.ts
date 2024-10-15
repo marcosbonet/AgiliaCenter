@@ -4,7 +4,7 @@ import jwt from "jsonwebtoken";
 import { verifyToken } from "../middleware/auth";
 
 const app = express();
-app.use(express.json()); // Para manejar solicitudes JSON
+app.use(express.json());
 
 // Crear una ruta de prueba que use el middleware
 app.get("/api/protected", verifyToken, (req, res) => {

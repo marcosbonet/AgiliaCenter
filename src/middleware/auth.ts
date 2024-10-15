@@ -1,26 +1,53 @@
 import { Request, Response, NextFunction } from "express";
-import jwt, { JwtPayload } from "jsonwebtoken";
+import jwt from "jsonwebtoken";
+import { IUser } from "../models/Users";
+
+// Update AuthRequest to use Pick<IUser>
+interface AuthRequest extends Request {
+  user?: Pick<IUser, "id" | "nickname" | "email">;
+}
 
 export const verifyToken = (
-  req: Request,
+  req: AuthRequest,
   res: Response,
   next: NextFunction
-) => {
-  const token = req.header("Authorization");
-  if (!token) return res.status(401).json({ message: "Acceso denegado" });
-
+): void => {
   try {
-    const verified = jwt.verify(
+    const token = req.header("Authorization")?.replace("Bearer ", "");
+
+    if (!token) {
+      res.status(401).json({ message: "Acceso denegado" });
+      return;
+    }
+
+    const decoded = jwt.verify(
       token,
       process.env.TOKEN_SECRET || ""
-    ) as JwtPayload; // Asegúrate de que sea de tipo JwtPayload
+    ) as jwt.JwtPayload;
+
+    // Ensure that decoded contains the necessary properties
+    if (
+      typeof decoded.id !== "string" ||
+      typeof decoded.nickname !== "string" ||
+      typeof decoded.email !== "string"
+    ) {
+      throw new Error("Token payload is invalid");
+    }
+
     req.user = {
-      id: verified.id,
-      nickname: verified.nickname,
-      email: verified.email,
-    }; // Asigna las propiedades que necesitas
-    next(); // Continuar con la solicitud
+      id: decoded.id,
+      nickname: decoded.nickname,
+      email: decoded.email,
+    };
+
+    next();
   } catch (error) {
-    res.status(400).json({ message: "Token no válido" });
+    if (error instanceof jwt.JsonWebTokenError) {
+      res.status(401).json({ message: "Token no válido" });
+    } else {
+      res.status(500).json({ message: "Error interno del servidor" });
+    }
   }
 };
+
+export type { AuthRequest };
